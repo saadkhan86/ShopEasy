@@ -1,0 +1,201 @@
+.alertContainer {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  min-width: 350px;
+  max-width: 500px;
+}
+
+.alert {
+  display: flex;
+  align-items: flex-start;
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  margin-bottom: 15px;
+  position: relative;
+  overflow: hidden;
+  transform: translateX(0);
+  opacity: 1;
+  transition: all 0.3s ease;
+}
+
+.alertExiting {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+/* Success Alert */
+.alertSuccess {
+  background: linear-gradient(135deg, #d4edda, #c3e6cb);
+  border: 1px solid #c3e6cb;
+  color: #155724;
+}
+
+.alertSuccess .alertIcon {
+  color: #28a745;
+}
+
+.alertSuccess .alertTitle {
+  color: #155724;
+}
+
+/* Error/Failure Alert */
+.alertError {
+  background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+  border: 1px solid #f5c6cb;
+  color: #721c24;
+}
+
+.alertError .alertIcon {
+  color: #dc3545;
+}
+
+.alertError .alertTitle {
+  color: #721c24;
+}
+
+.alertIcon {
+  font-size: 20px;
+  margin-right: 12px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.alertContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.alertTitle {
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+
+.alertMessage {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+/* Progress Bar */
+.progressBar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 0 0 12px 12px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  transition: width 0.05s linear;
+}
+
+.progressSuccess {
+  background: linear-gradient(90deg, #28a745, #34ce57);
+}
+
+.progressError {
+  background: linear-gradient(90deg, #dc3545, #e74c3c);
+}
+
+/* Close Button */
+.closeButton {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  margin-left: 12px;
+  margin-top: -2px;
+  opacity: 0.7;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.closeButton:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .alertContainer {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    min-width: auto;
+    max-width: none;
+  }
+
+  .alert {
+    min-width: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .alertContainer {
+    top: 5px;
+    right: 5px;
+    left: 5px;
+  }
+
+  .alert {
+    padding: 12px;
+  }
+
+  .alertTitle {
+    font-size: 15px;
+  }
+
+  .alertMessage {
+    font-size: 13px;
+  }
+
+  .alertIcon {
+    font-size: 18px;
+    margin-right: 10px;
+  }
+}
+
+/* Animation for new alerts */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.alert {
+  animation: slideInRight 0.3s ease;
+}
+
+/* Hover effects */
+.alert:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+}
+
+.alertExiting:hover {
+  transform: translateX(100%);
+}
+
+/* Focus states for accessibility */
+.closeButton:focus {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
