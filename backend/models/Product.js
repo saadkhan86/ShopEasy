@@ -1,3 +1,4 @@
+// models/Product.js
 const mongoose = require("mongoose");
 
 const productSchema = new mongoose.Schema({
@@ -10,6 +11,9 @@ const productSchema = new mongoose.Schema({
     type: Number,
     required: true,
     min: 0,
+  },
+  reviews: {
+    type: String,
   },
   category: {
     type: String,
@@ -48,10 +52,32 @@ const productSchema = new mongoose.Schema({
       trim: true,
     },
   ],
+  // Add createdBy field
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  // Add updatedAt field
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
 
-module.exports = mongoose.model("Product", productSchema);
+productSchema.methods.getAverageRating = function () {
+  return this.rating?.rate || 0;
+};
+
+productSchema.methods.getTotalReviews = function () {
+  return this.rating?.count || 0;
+};
+
+const Product =
+  mongoose.models.Product || mongoose.model("Product", productSchema);
+
+module.exports = Product;

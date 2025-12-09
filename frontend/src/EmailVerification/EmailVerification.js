@@ -15,6 +15,7 @@ function EmailVerification() {
 
   // Use the email from URL params directly
   const actualEmail = location.state?.email;
+  console.log(actualEmail);
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -30,22 +31,20 @@ function EmailVerification() {
 
     setLoading(true);
     try {
-      const response = await fetch(
-        `http://localhost:5000/api/auth/:${email}/verifyotp`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: actualEmail, // Use original email from URL
-            otp: otp, // Send OTP to backend
-          }),
-        }
-      );
+      console.log("one step far from /verify");
+      const response = await fetch(`http://localhost:5000/api/auth/verify`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: actualEmail, // Use original email from URL
+          otp: otp, // Send OTP to backend
+        }),
+      });
 
       const data = await response.json();
-
+      
       if (!response.ok) {
         showAlert(
           "failure",

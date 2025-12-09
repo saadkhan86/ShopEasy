@@ -37,8 +37,8 @@
   position: relative;
   padding: 8px 10px;
   border-radius: 25px;
-  flex-shrink: 0; /* Prevent shrinking */
-  white-space: nowrap; /* Prevent text wrapping */
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .brand:hover {
@@ -62,11 +62,11 @@
 .navLinks {
   display: flex;
   align-items: center;
-  gap: 16px; /* Increased gap for better spacing */
+  gap: 16px;
   margin: 0;
   padding: 0;
   list-style: none;
-  flex-wrap: wrap; /* Allow wrapping on very small screens */
+  flex-wrap: wrap;
 }
 
 .navItem {
@@ -89,10 +89,9 @@
   border: none;
   background: transparent;
   cursor: pointer;
-  white-space: nowrap; /* Prevent text wrapping */
+  white-space: nowrap;
 }
 
-/* Hover effect for each link */
 .navLink::before {
   content: '';
   position: absolute;
@@ -123,24 +122,146 @@
   border: 1px solid rgba(29, 185, 84, 0.3);
   transform: translateY(-1px);
 }
-.userStatus{
+
+.userStatus {
   border-radius: 20px;
-  background:#325132;
+  background: #325132;
   padding: 5px 10px;
   gap: 10px;
   display: flex;
   justify-content: center;
   align-items: center;
 }
-.userStatus .online{
+
+.userStatus .online {
   height: 10px;
   width: 10px;
   border-radius: 50% 50%;
-  background-color:#00ff00;
+  background-color: #00ff00;
 }
-.userStatus span{
+
+.userStatus span {
   color: #00ff00;
 }
+
+/* Admin Button Styles */
+.adminButton {
+  background: linear-gradient(135deg, #ffd700, #ffa500);
+  color: #333 !important;
+  font-weight: 600;
+}
+
+.adminButton:hover {
+  background: linear-gradient(135deg, #ffa500, #ff8c00);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 165, 0, 0.3);
+}
+
+.adminButton i {
+  color: #333;
+}
+
+/* Logout Button Styles */
+.logoutButton {
+  background: linear-gradient(135deg, #ff6b6b, #ff4757);
+  color: white !important;
+  font-weight: 600;
+}
+
+.logoutButton:hover {
+  background: linear-gradient(135deg, #ff4757, #ff3838);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 71, 87, 0.3);
+}
+
+/* Status indicator for admin */
+.userStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 215, 0, 0.1);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+.userStatus.adminStatus {
+  background: rgba(255, 215, 0, 0.2);
+  border-color: rgba(255, 215, 0, 0.5);
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.statusDot.online {
+  background-color: #1DB954;
+}
+
+.statusDot.admin {
+  background-color: #ffd700;
+}
+
+/* ===== ADMIN NAVBAR STYLES ===== */
+.adminNavbarContainer {
+  background: linear-gradient(135deg, #1a1a2e, #16213e) !important;
+  border-bottom: 2px solid #ffd700;
+}
+
+.adminNavbar {
+  background: transparent !important;
+}
+
+.exitAdminButton {
+  background: linear-gradient(135deg, #ff6b6b, #ff4757) !important;
+  color: white !important;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  padding: 10px 20px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  font-size: 16px;
+}
+
+.exitAdminButton:hover {
+  background: linear-gradient(135deg, #ff4757, #ff3838) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 71, 87, 0.3);
+}
+
+.exitIcon {
+  font-size: 18px;
+}
+
+.adminModeIndicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ffd700;
+  font-weight: 600;
+  padding: 8px 16px;
+  background: rgba(255, 215, 0, 0.1);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+.adminCrown {
+  font-size: 18px;
+  color: #ffd700;
+}
+
+.adminText {
+  color: #ffd700;
+  font-size: 14px;
+}
+
 /* ===== RESPONSIVE BREAKPOINTS ===== */
 
 /* Large screens (1200px and above) */
@@ -169,6 +290,17 @@
   .navLink {
     font-size: 17px;
     padding: 9px 14px !important;
+  }
+  
+  /* Admin navbar adjustments */
+  .exitAdminButton {
+    padding: 8px 16px;
+    font-size: 15px;
+  }
+  
+  .adminModeIndicator {
+    padding: 6px 12px;
+    font-size: 14px;
   }
 }
 
@@ -202,6 +334,17 @@
     font-size: 13px;
     padding: 6px 12px;
     margin-left: 15px;
+  }
+  
+  /* Admin navbar adjustments */
+  .exitAdminButton {
+    padding: 7px 14px;
+    font-size: 14px;
+  }
+  
+  .adminModeIndicator {
+    padding: 5px 10px;
+    font-size: 13px;
   }
 }
 
@@ -239,6 +382,21 @@
   /* Hide user status text on medium mobile */
   .userStatus {
     display: none;
+  }
+  
+  /* Admin navbar adjustments */
+  .exitAdminButton {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  
+  .adminModeIndicator {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+  
+  .adminCrown {
+    font-size: 16px;
   }
 }
 
@@ -282,6 +440,21 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  
+  /* Admin navbar adjustments */
+  .exitAdminButton {
+    padding: 5px 10px;
+    font-size: 12px;
+    gap: 6px;
+  }
+  
+  .exitIcon {
+    font-size: 16px;
+  }
+  
+  .adminText {
+    display: none;
+  }
 }
 
 /* Extra Small Mobile (480px to 569px) - Icon + minimal text */
@@ -319,6 +492,16 @@
   .navLink span {
     max-width: 25px;
   }
+  
+  /* Admin navbar adjustments */
+  .exitAdminButton {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+  
+  .exitIcon {
+    font-size: 15px;
+  }
 }
 
 /* Tiny Mobile (400px to 479px) - Mostly icons */
@@ -328,9 +511,9 @@
   }
   
   .brand {
-    font-size: 0; /* Hide text completely */
+    font-size: 0;
     padding: 6px 8px;
-    border-radius: 50%; /* Make circular */
+    border-radius: 50%;
     aspect-ratio: 1/1;
   }
   
@@ -345,7 +528,7 @@
   
   .navLink {
     padding: 6px 8px !important;
-    border-radius: 50%; /* Make circular */
+    border-radius: 50%;
     aspect-ratio: 1/1;
     justify-content: center;
   }
@@ -367,6 +550,32 @@
   
   .navLink i.fa-right-to-bracket {
     font-size: 14px;
+  }
+  
+  /* Admin navbar adjustments */
+  .exitAdminButton {
+    padding: 8px 12px;
+    font-size: 0;
+    border-radius: 50%;
+    aspect-ratio: 1/1;
+    justify-content: center;
+  }
+  
+  .exitIcon {
+    font-size: 18px;
+    margin: 0;
+  }
+  
+  .adminModeIndicator {
+    padding: 4px 6px;
+    border-radius: 50%;
+    aspect-ratio: 1/1;
+    justify-content: center;
+  }
+  
+  .adminCrown {
+    font-size: 16px;
+    margin: 0;
   }
 }
 
@@ -404,6 +613,17 @@
   
   .navLink i.fa-right-to-bracket {
     font-size: 13px;
+  }
+  
+  /* Admin navbar adjustments */
+  .exitAdminButton {
+    padding: 6px 8px;
+    min-width: 40px;
+    min-height: 40px;
+  }
+  
+  .exitIcon {
+    font-size: 16px;
   }
 }
 
@@ -461,7 +681,11 @@
 /* Touch-friendly adjustments for mobile */
 @media (hover: none) and (pointer: coarse) {
   .navLink {
-    padding: 12px 16px !important; /* Larger touch targets */
+    padding: 12px 16px !important;
+  }
+  
+  .exitAdminButton {
+    padding: 12px 16px !important;
   }
   
   @media (max-width: 479px) {
@@ -472,6 +696,12 @@
     }
     
     .brand {
+      padding: 10px !important;
+      min-width: 44px;
+      min-height: 44px;
+    }
+    
+    .exitAdminButton {
       padding: 10px !important;
       min-width: 44px;
       min-height: 44px;
@@ -497,6 +727,16 @@
     color: #00ff00 !important;
     border: 2px solid #00ff00;
   }
+  
+  .exitAdminButton {
+    border: 2px solid #00ff00;
+    color: #00ff00 !important;
+    background: #000 !important;
+  }
+  
+  .adminModeIndicator {
+    border: 2px solid #ffd700;
+  }
 }
 
 /* Reduced motion preference */
@@ -504,7 +744,8 @@
   .navLink::before,
   .navLink:hover,
   .brand:hover,
-  .navBar {
+  .navBar,
+  .exitAdminButton {
     transition: none;
     animation: none;
   }

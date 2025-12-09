@@ -1,0 +1,30 @@
+/* AdminProtectedRoute.module.css */
+.loadingContainer {
+  background: linear-gradient(135deg, #0f0f0f, #1a1a1a, #0f0f0f);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.spinner {
+  font-size: 3rem;
+  color: #28a745;
+  margin-bottom: 20px;
+  text-shadow: 0 0 20px rgba(40, 167, 69, 0.5);
+}
+
+.loadingText {
+  color: #e0e0e0;
+  font-size: 1.2rem;
+  font-weight: 500;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}

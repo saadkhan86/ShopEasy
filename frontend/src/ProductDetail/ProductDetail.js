@@ -42,7 +42,7 @@ const ProductDetail = () => {
         throw new Error(data.message || "Failed to fetch product");
       }
     } catch (err) {
-      showAlert("failure",err.message,"profile error");
+      showAlert("failure", err.message, "profile error");
       // setError(err.message);
     } finally {
       setLoading(false);
@@ -75,7 +75,7 @@ const ProductDetail = () => {
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_BASE_URL}/cart`, {
+      const response = await fetch(`${API_BASE_URL}/cart/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -94,7 +94,7 @@ const ProductDetail = () => {
       }
 
       if (data.success) {
-        showAlert("success",`✅ Added ${quantity} ${product.title} to cart!`);
+        showAlert("success", `✅ Added ${quantity} ${product.title} to cart!`);
       }
     } catch (err) {
       alert(`❌ Error: ${err.message}`);
@@ -182,6 +182,10 @@ const ProductDetail = () => {
 
   return (
     <div className={styles.container}>
+      <i
+        className={`fa-solid fa-arrow-left ${styles.backArrow}`}
+        onClick={() => navigate(-1)}
+      ></i>
       <div className={styles.productDetail}>
         {/* Product Images */}
         <div className={styles.imageSection}>

@@ -1,5 +1,5 @@
 const express = require("express");
-const User = require("../models/User");
+const User = require("../models/user");
 const Product = require("../models/Product");
 const { authenticateToken } = require("../middleware/auth");
 
@@ -7,6 +7,11 @@ const router = express.Router();
 
 // All cart routes are protected
 router.use(authenticateToken);
+
+// Helper to get user with cart
+const getUserWithCart = async (userId) => {
+  return await User.findById(userId);
+};
 
 // Add to cart
 router.post("/", async (req, res) => {
@@ -29,7 +34,14 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const user = req.user;
+    // ✅ FIX: Fetch user from database
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
 
     // Check if product already in cart
     const existingCartItem = user.cart.find(
@@ -44,6 +56,7 @@ router.post("/", async (req, res) => {
       user.cart.push({
         productId,
         quantity,
+        addedAt: new Date(),
       });
     }
 
@@ -56,7 +69,6 @@ router.post("/", async (req, res) => {
       cart: user.cart,
     });
   } catch (error) {
-    // console.error("Add to cart error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -68,12 +80,20 @@ router.post("/", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const user = await User.findById(req.user._id).populate("cart.productId");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
     res.json({
       success: true,
-      cart: user.cart,
+      cart: user.cart || [],
     });
   } catch (error) {
-    // console.error("Get cart error:", error);
+    console.error("Get cart error:", error.message);
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -94,7 +114,15 @@ router.put("/:productId", async (req, res) => {
       });
     }
 
-    const user = req.user;
+    // ✅ FIX: Fetch user from database
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
     const cartItem = user.cart.find(
       (item) => item.productId.toString() === productId
     );
@@ -116,7 +144,7 @@ router.put("/:productId", async (req, res) => {
       cart: user.cart,
     });
   } catch (error) {
-    // console.error("Update cart error:", error);
+    console.error("Update cart error:", error.message);
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -129,7 +157,15 @@ router.delete("/:productId", async (req, res) => {
   try {
     const { productId } = req.params;
 
-    const user = req.user;
+    // ✅ FIX: Fetch user from database
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
     user.cart = user.cart.filter(
       (item) => item.productId.toString() !== productId
     );
@@ -143,7 +179,7 @@ router.delete("/:productId", async (req, res) => {
       cart: user.cart,
     });
   } catch (error) {
-    // console.error("Remove from cart error:", error);
+    console.error("Remove from cart error:", error.message);
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -154,7 +190,15 @@ router.delete("/:productId", async (req, res) => {
 // Clear cart
 router.delete("/", async (req, res) => {
   try {
-    const user = req.user;
+    // ✅ FIX: Fetch user from database
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
     user.cart = [];
     await user.save();
 
@@ -164,7 +208,7 @@ router.delete("/", async (req, res) => {
       cart: [],
     });
   } catch (error) {
-    // console.error("Clear cart error:", error);
+    console.error("Clear cart error:", error.message);
     res.status(500).json({
       success: false,
       message: "Internal server error",

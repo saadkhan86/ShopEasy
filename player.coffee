@@ -70,20 +70,23 @@ player
 
 
 
+
 backend/
 ├── config/
 │   └── database.js
 ├── controllers/
+│   ├──adminController.js
 │   ├── authController.js          
 │   ├── otpController.js
 │   └── passwordController.js      
 ├── middleware/
 │   ├── auth.js
-│   └── rateLimiter.js            
+│   └── adminAuth.js            
 ├── models/
 │   ├── otp.js
 │   ├── product.js
-│   └── user.js                  
+│   └── user.js 
+│   └── order.js                 
 ├── routes/
 │   ├── otp.js
 │   ├── auth.js
@@ -91,7 +94,8 @@ backend/
 │   ├── products.js
 │   └── password.js                
 ├── utils/
-│   └── sendEmail.js              
+│   └── sendEmail.js
+│   └── generateOTP.js              
 ├── .env                         
 ├── package.json                  
 └── server.js                     
@@ -119,4 +123,8 @@ frontend/src/
 ├── Services/
 ├── Signup/
 ├── Terms/
-└── App.js                      
+└── App.js 
+
+
+
+dukh jitny hinn taydi zindgi whhich mayry naaan lawa mayn mull ghinsaan

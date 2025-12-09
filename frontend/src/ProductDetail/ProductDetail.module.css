@@ -6,7 +6,18 @@
   padding: 20px;
   transition: background-color 0.3s ease;
 }
+.container .backArrow{
+  scale: 2;
+  margin-bottom: 30px;
+  margin-left: 10px;
+  color: #28a745;
+}
 
+.container .backArrow:hover{
+  cursor: pointer;
+  scale: (1.01);
+  color: #24c94a;
+}
 .breadcrumb {
   display: flex;
   align-items: center;

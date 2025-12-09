@@ -6,7 +6,18 @@
   overflow: hidden;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
+.profileContainer .animatedBackground .backArrow{
+  scale: 2 !important;
+  margin-top: 10px !important;
+  margin-left: 40px !important;
+  color: #28a745 !important;
+}
 
+.profileContainer .animatedBackground .backArrow:hover{
+  cursor: pointer !important;
+  scale: 2.01 !important;
+  color: #24c94a !important;
+}
 /* Animated Background */
 .animatedBackground {
   position: absolute;
@@ -473,7 +484,9 @@
   transition: all 0.3s ease;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
-
+.listingsBtn:hover{
+  cursor: pointer;
+}
 .activityItem:hover {
   background: rgba(255, 255, 255, 0.08);
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);

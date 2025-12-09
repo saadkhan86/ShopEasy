@@ -1,17 +1,53 @@
 const express = require("express");
-const Product = require("../models/Product");
+const Product = require("../models/product");
+const User = require("../models/user");
+const mongoose = require("mongoose");
+const { authenticateToken } = require("../middleware/auth");
 
 const router = express.Router();
 
-// Get all products
-// In routes/products.js - make sure it returns all products when no limit
+// Apply authentication middleware to all listing management routes
+const listingRouter = express.Router();
+listingRouter.use(authenticateToken);
+
+// ============================================
+// PUBLIC ROUTES (No authentication required)
+// ============================================
+
+// Get all products (public)
 router.get("/", async (req, res) => {
   try {
-    const { category, search, page = 1, limit = 50 } = req.query; // Default limit to 50
+    const {
+      category,
+      search,
+      page = 1,
+      limit = 50,
+      minPrice,
+      maxPrice,
+    } = req.query;
 
     let query = {};
 
-    // ... your existing filters ...
+    // Category filter
+    if (category && category !== "all") {
+      query.category = { $regex: category, $options: "i" };
+    }
+
+    // Search filter
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { category: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // Price range filter
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = parseFloat(minPrice);
+      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+    }
 
     const skip = (page - 1) * limit;
 
@@ -30,14 +66,612 @@ router.get("/", async (req, res) => {
       totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
-    // ... error handling ...
+    console.error("Get products error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
   }
 });
-// Get single product
+
+// Get products by category (public) - Moved before /:id route
+router.get("/category/:category", async (req, res) => {
+  try {
+    const { category } = req.params;
+    const { page = 1, limit = 20 } = req.query;
+
+    const skip = (page - 1) * limit;
+
+    const products = await Product.find({
+      category: { $regex: category, $options: "i" },
+    })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Product.countDocuments({
+      category: { $regex: category, $options: "i" },
+    });
+
+    res.json({
+      success: true,
+      data: products,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (error) {
+    console.error("Get products by category error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+});
+
+// ============================================
+// LISTING MANAGEMENT ROUTES (Authentication required)
+// ============================================
+
+// Create a new listing
+listingRouter.post("/create", async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user._id;
+    const {
+      title,
+      price,
+      category,
+      description,
+      image,
+      stock,
+      features,
+      reviews,
+    } = req.body;
+
+    // Validation
+    if (!title || !price || !category) {
+      return res.status(400).json({
+        success: false,
+        message: "Title, price, and category are required fields",
+      });
+    }
+
+    if (price < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Price cannot be negative",
+      });
+    }
+
+    if (stock && stock < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Stock cannot be negative",
+      });
+    }
+
+    // Check if user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Create the product
+    const newProduct = new Product({
+      title,
+      price: parseFloat(price),
+      category,
+      description: description || "",
+      image: image || "",
+      stock: stock || 0,
+      features: Array.isArray(features) ? features : [],
+      reviews: reviews || "",
+      rating: {
+        rate: 0,
+        count: 0,
+      },
+      createdBy: userId,
+    });
+
+    // Save the product
+    const savedProduct = await newProduct.save();
+
+    // Add product to user's listings
+    await User.findByIdAndUpdate(
+      userId,
+      {
+        $push: {
+          listings: {
+            productId: savedProduct._id,
+            status: "active",
+          },
+        },
+      },
+      { new: true }
+    );
+
+    res.status(201).json({
+      success: true,
+      message: "Listing created successfully",
+      product: savedProduct,
+    });
+  } catch (error) {
+    console.error("Create listing error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to create listing",
+      error: error.message,
+    });
+  }
+});
+
+// Get user's own listings
+// Get user's own listings - Add debugging
+listingRouter.get("/my-listings", async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user._id;
+    const { status, page = 1, limit = 20 } = req.query;
+
+    console.log("=== GET MY-LISTINGS DEBUG ===");
+    console.log("Authenticated User ID:", userId);
+    console.log("User from token:", req.user);
+    console.log("Status filter:", status);
+
+    // First, try to get products directly by createdBy
+    const directProducts = await Product.find({ createdBy: userId });
+    console.log("Direct products by createdBy:", directProducts.length);
+    console.log(
+      "Direct product IDs:",
+      directProducts.map((p) => p._id)
+    );
+
+    // Get user with populated listings
+    const user = await User.findById(userId)
+      .populate({
+        path: "listings.productId",
+        model: "Product",
+      })
+      .select("listings");
+
+    console.log("User found:", user ? "Yes" : "No");
+    console.log("User listings array:", user?.listings?.length || 0);
+
+    if (user?.listings?.length > 0) {
+      console.log("Listings details:");
+      user.listings.forEach((item, index) => {
+        console.log(
+          `[${index}] ProductId: ${item.productId}, Status: ${item.status}`
+        );
+      });
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Filter listings by status if provided
+    let listings = user.listings || [];
+    console.log("Listings before filter:", listings.length);
+
+    if (status && status !== "all") {
+      listings = listings.filter((item) => item.status === status);
+      console.log("Listings after filter:", listings.length);
+    }
+
+    // Format the listings
+    const formattedListings = listings.map((item) => ({
+      _id: item.productId?._id,
+      title: item.productId?.title,
+      price: item.productId?.price,
+      category: item.productId?.category,
+      description: item.productId?.description,
+      image: item.productId?.image,
+      stock: item.productId?.stock,
+      rating: item.productId?.rating,
+      features: item.productId?.features || [],
+      status: item.status,
+      createdAt: item.createdAt,
+      updatedAt: item.productId?.updatedAt,
+    }));
+
+    console.log("Formatted listings count:", formattedListings.length);
+
+    // Apply pagination
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit;
+    const paginatedListings = formattedListings.slice(startIndex, endIndex);
+
+    res.json({
+      success: true,
+      listings: paginatedListings,
+      total: formattedListings.length,
+      page: parseInt(page),
+      totalPages: Math.ceil(formattedListings.length / limit),
+      debug: {
+        userId,
+        directProductsCount: directProducts.length,
+        userListingsCount: user.listings?.length || 0,
+        formattedCount: formattedListings.length,
+      },
+    });
+  } catch (error) {
+    console.error("Get user listings error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch listings",
+      error: error.message,
+    });
+  }
+});
+// Update a listing
+listingRouter.put("/:productId", async (req, res) => {
+  console.log("here we go");
+  try {
+    const userId = req.user.userId || req.user._id;
+    const { productId } = req.params;
+    const updates = req.body;
+
+    // Validate productId
+    if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid product ID is required",
+      });
+    }
+
+    // Check if user owns the listing
+    const user = await User.findOne({
+      _id: userId,
+      "listings.productId": productId,
+    });
+
+    if (!user) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to update this listing",
+      });
+    }
+
+    // Don't allow updating rating, createdBy, or changing the product owner
+    const restrictedFields = ["rating", "createdBy", "_id"];
+    for (const field of restrictedFields) {
+      if (updates[field] !== undefined) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot update ${field} field`,
+        });
+      }
+    }
+
+    // Validate price and stock if provided
+    if (updates.price !== undefined && updates.price < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Price cannot be negative",
+      });
+    }
+
+    if (updates.stock !== undefined && updates.stock < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Stock cannot be negative",
+      });
+    }
+
+    // Update the product
+    const updatedProduct = await Product.findByIdAndUpdate(
+      productId,
+      {
+        $set: updates,
+        updatedAt: Date.now(),
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedProduct) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Listing updated successfully",
+      product: updatedProduct,
+    });
+  } catch (error) {
+    console.error("Update listing error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update listing",
+      error: error.message,
+    });
+  }
+});
+
+// Delete a listing
+listingRouter.delete("/:productId", async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user._id;
+    const { productId } = req.params;
+
+    // Validate productId
+    if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid product ID is required",
+      });
+    }
+
+    // Check if the product exists and get owner info
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    // Check if user owns the listing
+    const isOwner = product.createdBy.toString() === userId.toString();
+
+    if (!isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to delete this listing",
+      });
+    }
+
+    // Delete the product
+    await Product.findByIdAndDelete(productId);
+
+    // Remove from user's listings
+    await User.findByIdAndUpdate(
+      userId,
+      {
+        $pull: {
+          listings: { productId: productId },
+        },
+      },
+      { new: true }
+    );
+
+    res.json({
+      success: true,
+      message: "Listing deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete listing error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete listing",
+      error: error.message,
+    });
+  }
+});
+// Get single listing (with authorization check)
+listingRouter.get("/listing/:productId", async (req, res) => {
+  console.log("get listing");
+  try {
+    const userId = req.user.userId || req.user._id;
+    const { productId } = req.params;
+
+    if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid product ID is required",
+      });
+    }
+
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Listing not found",
+      });
+    }
+
+    // Check if user owns the listing or is admin
+    const user = await User.findOne({
+      _id: userId,
+      "listings.productId": productId,
+    });
+
+    if (!user && !req.user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to view this listing",
+      });
+    }
+
+    res.json({
+      success: true,
+      product,
+    });
+  } catch (error) {
+    console.error("Get listing error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch listing",
+      error: error.message,
+    });
+  }
+});
+
+// Update listing status
+listingRouter.patch("/:productId/status", async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user._id;
+    const { productId } = req.params;
+    const { status } = req.body;
+
+    const validStatuses = ["active", "inactive", "sold", "pending"];
+
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Status must be one of: ${validStatuses.join(", ")}`,
+      });
+    }
+
+    // Check if user owns the listing
+    const user = await User.findOne({
+      _id: userId,
+      "listings.productId": productId,
+    });
+
+    if (!user && !req.user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to update this listing",
+      });
+    }
+
+    // Update the listing status in user's listings array
+    const updatedUser = await User.findOneAndUpdate(
+      {
+        _id: userId,
+        "listings.productId": productId,
+      },
+      {
+        $set: { "listings.$.status": status },
+      },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "Listing not found in your listings",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Listing status updated to ${status}`,
+      status,
+    });
+  } catch (error) {
+    console.error("Update listing status error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update listing status",
+      error: error.message,
+    });
+  }
+});
+
+// Admin: Get all listings (with filtering)
+listingRouter.get("/admin/all", async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "Admin access required",
+      });
+    }
+
+    const {
+      page = 1,
+      limit = 20,
+      category,
+      minPrice,
+      maxPrice,
+      search,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+    } = req.query;
+
+    // Build filter
+    const filter = {};
+
+    if (category) {
+      filter.category = { $regex: category, $options: "i" };
+    }
+
+    if (minPrice || maxPrice) {
+      filter.price = {};
+      if (minPrice) filter.price.$gte = parseFloat(minPrice);
+      if (maxPrice) filter.price.$lte = parseFloat(maxPrice);
+    }
+
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { category: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // Build sort
+    const sort = {};
+    sort[sortBy] = sortOrder === "desc" ? -1 : 1;
+
+    // Execute query
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [listings, total] = await Promise.all([
+      Product.find(filter)
+        .sort(sort)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .populate("createdBy", "name email"),
+      Product.countDocuments(filter),
+    ]);
+
+    res.json({
+      success: true,
+      listings,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit)),
+      },
+    });
+  } catch (error) {
+    console.error("Get all listings error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch listings",
+      error: error.message,
+    });
+  }
+});
+
+// ============================================
+// MOUNT LISTING ROUTES
+// ============================================
+
+// Mount listing routes under /listings path
+router.use("/listings", listingRouter);
+
+// ============================================
+// PUBLIC PARAMETER ROUTES (must come after all specific routes)
+// ============================================
+
+// Get single product (public) - This should be LAST
 router.get("/:id", async (req, res) => {
   try {
+    // Validate if the ID is a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid product ID format",
+      });
+    }
+
     const product = await Product.findById(req.params.id);
-    // console.log(product);
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -50,17 +684,30 @@ router.get("/:id", async (req, res) => {
       data: product,
     });
   } catch (error) {
-    // console.error("Product error:", error);
+    console.error("Get product error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",
     });
   }
 });
-// Initialize sample products
+
+// ============================================
+// ADMIN ROUTES (Admin only - for sample data)
+// ============================================
+
+// Initialize sample products (Admin only)
 router.post("/init-products", async (req, res) => {
   try {
-    const sampleProducts=[
+    // You might want to add admin check here
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "Admin access required",
+      });
+    }
+
+    const sampleProducts = [
       {
         title: "iPhone 14 Pro Max",
         price: 1099.99,
@@ -70,6 +717,7 @@ router.post("/init-products", async (req, res) => {
         rating: { rate: 4.8, count: 150 },
         stock: 45,
         features: ["5G", "Face ID", "Pro Camera"],
+        createdBy: new mongoose.Types.ObjectId(),
       },
       {
         title: "MacBook Pro 16-inch",
@@ -80,551 +728,36 @@ router.post("/init-products", async (req, res) => {
         rating: { rate: 4.9, count: 89 },
         stock: 23,
         features: ["M2 Chip", "Retina Display", "Touch Bar"],
-      },
-      {
-        title: "Samsung Galaxy S23",
-        price: 899.99,
-        category: "electronics",
-        description: "Powerful Android phone with stunning display",
-        image: "https://picsum.photos/400/400?random=3",
-        rating: { rate: 4.6, count: 200 },
-        stock: 67,
-        features: ["120Hz Display", "5G", "Wireless Charging"],
-      },
-      {
-        title: "Sony WH-1000XM4 Headphones",
-        price: 349.99,
-        category: "electronics",
-        description: "Noise cancelling wireless headphones",
-        image: "https://picsum.photos/400/400?random=4",
-        rating: { rate: 4.7, count: 156 },
-        stock: 89,
-        features: ["Noise Cancellation", "30hr Battery", "Touch Control"],
-      },
-      {
-        title: "Nike Air Max 270",
-        price: 149.99,
-        category: "shoes",
-        description: "Comfortable running shoes with air cushioning",
-        image: "https://picsum.photos/400/400?random=5",
-        rating: { rate: 4.4, count: 278 },
-        stock: 120,
-        features: ["Air Cushion", "Breathable", "Lightweight"],
-      },
-      {
-        title: "Adidas Ultraboost 22",
-        price: 179.99,
-        category: "shoes",
-        description: "Premium running shoes with boost technology",
-        image: "https://picsum.photos/400/400?random=6",
-        rating: { rate: 4.5, count: 189 },
-        stock: 85,
-        features: ["Boost Midsole", "Primeknit Upper", "Continental Rubber"],
-      },
-      {
-        title: "Samsung 4K Smart TV",
-        price: 799.99,
-        category: "electronics",
-        description: "55-inch 4K UHD Smart Television",
-        image: "https://picsum.photos/400/400?random=7",
-        rating: { rate: 4.3, count: 234 },
-        stock: 34,
-        features: ["4K UHD", "Smart TV", "HDR"],
-      },
-      {
-        title: "iPad Air",
-        price: 599.99,
-        category: "electronics",
-        description: "Powerful tablet with M1 chip",
-        image: "https://picsum.photos/400/400?random=8",
-        rating: { rate: 4.7, count: 167 },
-        stock: 56,
-        features: ["M1 Chip", "10.9-inch Display", "Touch ID"],
-      },
-      {
-        title: "PlayStation 5",
-        price: 499.99,
-        category: "electronics",
-        description: "Next-gen gaming console",
-        image: "https://picsum.photos/400/400?random=9",
-        rating: { rate: 4.9, count: 456 },
-        stock: 12,
-        features: ["4K Gaming", "SSD Storage", "DualSense Controller"],
-      },
-      {
-        title: "Xbox Series X",
-        price: 499.99,
-        category: "electronics",
-        description: "High-performance gaming console",
-        image: "https://picsum.photos/400/400?random=10",
-        rating: { rate: 4.8, count: 321 },
-        stock: 18,
-        features: ["4K Gaming", "1TB SSD", "Game Pass"],
-      },
-      {
-        title: "Levi's 511 Slim Jeans",
-        price: 69.99,
-        category: "clothing",
-        description: "Classic slim fit jeans",
-        image: "https://picsum.photos/400/400?random=11",
-        rating: { rate: 4.2, count: 456 },
-        stock: 200,
-        features: ["Slim Fit", "98% Cotton", "Machine Washable"],
-      },
-      {
-        title: "Nike Dri-FIT T-Shirt",
-        price: 34.99,
-        category: "clothing",
-        description: "Moisture-wicking workout t-shirt",
-        image: "https://picsum.photos/400/400?random=12",
-        rating: { rate: 4.3, count: 289 },
-        stock: 150,
-        features: ["Moisture-Wicking", "Breathable", "Quick Dry"],
-      },
-      {
-        title: "The North Face Jacket",
-        price: 199.99,
-        category: "clothing",
-        description: "Waterproof outdoor jacket",
-        image: "https://picsum.photos/400/400?random=13",
-        rating: { rate: 4.6, count: 178 },
-        stock: 67,
-        features: ["Waterproof", "Windproof", "Breathable"],
-      },
-      {
-        title: "Apple Watch Series 8",
-        price: 399.99,
-        category: "electronics",
-        description: "Advanced smartwatch with health features",
-        image: "https://picsum.photos/400/400?random=14",
-        rating: { rate: 4.5, count: 234 },
-        stock: 89,
-        features: ["GPS", "Heart Rate Monitor", "Water Resistant"],
-      },
-      {
-        title: "Dell XPS 13 Laptop",
-        price: 999.99,
-        category: "electronics",
-        description: "Compact premium laptop",
-        image: "https://picsum.photos/400/400?random=15",
-        rating: { rate: 4.4, count: 156 },
-        stock: 45,
-        features: ["13-inch Display", "Intel i7", "16GB RAM"],
-      },
-      {
-        title: "Canon EOS R5 Camera",
-        price: 3899.99,
-        category: "electronics",
-        description: "Professional mirrorless camera",
-        image: "https://picsum.photos/400/400?random=16",
-        rating: { rate: 4.8, count: 89 },
-        stock: 15,
-        features: ["45MP", "8K Video", "Image Stabilization"],
-      },
-      {
-        title: "Amazon Echo Dot",
-        price: 49.99,
-        category: "electronics",
-        description: "Smart speaker with Alexa",
-        image: "https://picsum.photos/400/400?random=17",
-        rating: { rate: 4.3, count: 567 },
-        stock: 300,
-        features: ["Alexa", "Voice Control", "Smart Home"],
-      },
-      {
-        title: "Instant Pot Pro",
-        price: 129.99,
-        category: "home",
-        description: "Multi-use pressure cooker",
-        image: "https://picsum.photos/400/400?random=18",
-        rating: { rate: 4.6, count: 678 },
-        stock: 120,
-        features: ["10-in-1", "Pressure Cook", "Slow Cook"],
-      },
-      {
-        title: "KitchenAid Stand Mixer",
-        price: 429.99,
-        category: "home",
-        description: "Professional kitchen mixer",
-        image: "https://picsum.photos/400/400?random=19",
-        rating: { rate: 4.8, count: 345 },
-        stock: 56,
-        features: ["5-Quart", "10 Speeds", "Tilt-Head"],
-      },
-      {
-        title: "Dyson V11 Vacuum",
-        price: 599.99,
-        category: "home",
-        description: "Cordless stick vacuum cleaner",
-        image: "https://picsum.photos/400/400?random=20",
-        rating: { rate: 4.5, count: 432 },
-        stock: 78,
-        features: ["Cordless", "60min Runtime", "HEPA Filter"],
-      },
-      {
-        title: "Nespresso Vertuo Plus",
-        price: 179.99,
-        category: "home",
-        description: "Coffee and espresso machine",
-        image: "https://picsum.photos/400/400?random=21",
-        rating: { rate: 4.4, count: 289 },
-        stock: 95,
-        features: ["Centrifusion", "19oz Reservoir", "Auto-Eject"],
-      },
-      {
-        title: "Adidas Soccer Ball",
-        price: 39.99,
-        category: "sports",
-        description: "Official match soccer ball",
-        image: "https://picsum.photos/400/400?random=22",
-        rating: { rate: 4.2, count: 167 },
-        stock: 200,
-        features: ["FIFA Pro", "Machine Stitched", "Water Resistant"],
-      },
-      {
-        title: "Wilson Tennis Racket",
-        price: 199.99,
-        category: "sports",
-        description: "Professional tennis racket",
-        image: "https://picsum.photos/400/400?random=23",
-        rating: { rate: 4.5, count: 134 },
-        stock: 67,
-        features: ["Graphite", "16x19 Pattern", "295g"],
-      },
-      {
-        title: "Yoga Mat Premium",
-        price: 29.99,
-        category: "sports",
-        description: "Non-slip exercise yoga mat",
-        image: "https://picsum.photos/400/400?random=24",
-        rating: { rate: 4.3, count: 456 },
-        stock: 180,
-        features: ["Non-Slip", "6mm Thick", "Eco-Friendly"],
-      },
-      {
-        title: "Ray-Ban Aviator Sunglasses",
-        price: 159.99,
-        category: "accessories",
-        description: "Classic aviator style sunglasses",
-        image: "https://picsum.photos/400/400?random=25",
-        rating: { rate: 4.7, count: 289 },
-        stock: 89,
-        features: ["UV Protection", "Metal Frame", "Polarized"],
-      },
-      {
-        title: "Fossil Smartwatch",
-        price: 199.99,
-        category: "accessories",
-        description: "Hybrid smartwatch with notifications",
-        image: "https://picsum.photos/400/400?random=26",
-        rating: { rate: 4.2, count: 178 },
-        stock: 120,
-        features: ["Heart Rate", "Notifications", "20m Water Resistant"],
-      },
-      {
-        title: "Herschel Backpack",
-        price: 79.99,
-        category: "accessories",
-        description: "Classic laptop backpack",
-        image: "https://picsum.photos/400/400?random=27",
-        rating: { rate: 4.4, count: 345 },
-        stock: 156,
-        features: ["15-inch Laptop", "Multiple Pockets", "Padded Straps"],
-      },
-      {
-        title: "Samsung Galaxy Watch",
-        price: 279.99,
-        category: "electronics",
-        description: "Advanced fitness tracking smartwatch",
-        image: "https://picsum.photos/400/400?random=28",
-        rating: { rate: 4.3, count: 234 },
-        stock: 78,
-        features: ["GPS", "Sleep Tracking", "5ATM Water Resistant"],
-      },
-      {
-        title: "GoPro HERO11",
-        price: 399.99,
-        category: "electronics",
-        description: "Action camera for adventures",
-        image: "https://picsum.photos/400/400?random=29",
-        rating: { rate: 4.6, count: 189 },
-        stock: 45,
-        features: ["5.3K Video", "HyperSmooth", "Waterproof"],
-      },
-      {
-        title: "Bose QuietComfort Earbuds",
-        price: 279.99,
-        category: "electronics",
-        description: "Noise cancelling true wireless earbuds",
-        image: "https://picsum.photos/400/400?random=30",
-        rating: { rate: 4.5, count: 267 },
-        stock: 89,
-        features: ["Noise Cancelling", "6hr Battery", "Sweat Resistant"],
-      },
-      {
-        title: "LG OLED TV",
-        price: 1499.99,
-        category: "electronics",
-        description: "65-inch OLED 4K Smart TV",
-        image: "https://picsum.photos/400/400?random=31",
-        rating: { rate: 4.8, count: 156 },
-        stock: 23,
-        features: ["OLED", "4K", "Smart TV", "Dolby Vision"],
-      },
-      {
-        title: "ASUS Gaming Monitor",
-        price: 399.99,
-        category: "electronics",
-        description: "27-inch gaming monitor 144Hz",
-        image: "https://picsum.photos/400/400?random=32",
-        rating: { rate: 4.4, count: 189 },
-        stock: 67,
-        features: ["144Hz", "1ms Response", "FreeSync"],
-      },
-      {
-        title: "HP OfficeJet Printer",
-        price: 129.99,
-        category: "electronics",
-        description: "All-in-one wireless printer",
-        image: "https://picsum.photos/400/400?random=33",
-        rating: { rate: 4.1, count: 345 },
-        stock: 120,
-        features: ["Wireless", "Scan", "Copy", "Print"],
-      },
-      {
-        title: "Fitbit Charge 5",
-        price: 149.99,
-        category: "electronics",
-        description: "Advanced fitness and health tracker",
-        image: "https://picsum.photos/400/400?random=34",
-        rating: { rate: 4.2, count: 456 },
-        stock: 178,
-        features: ["Heart Rate", "GPS", "Sleep Score", "Stress Management"],
-      },
-      {
-        title: "JBL Flip 6 Speaker",
-        price: 129.99,
-        category: "electronics",
-        description: "Portable Bluetooth speaker",
-        image: "https://picsum.photos/400/400?random=35",
-        rating: { rate: 4.5, count: 289 },
-        stock: 200,
-        features: ["Waterproof", "12hr Battery", "PartyBoost"],
-      },
-      {
-        title: "Apple AirPods Pro",
-        price: 249.99,
-        category: "electronics",
-        description: "Wireless earbuds with active noise cancellation",
-        image: "https://picsum.photos/400/400?random=36",
-        rating: { rate: 4.6, count: 345 },
-        stock: 156,
-        features: ["Noise Cancellation", "Spatial Audio", "Wireless Charging"],
-      },
-      {
-        title: "Microsoft Surface Pro",
-        price: 899.99,
-        category: "electronics",
-        description: "Versatile 2-in-1 laptop and tablet",
-        image: "https://picsum.photos/400/400?random=37",
-        rating: { rate: 4.4, count: 234 },
-        stock: 67,
-        features: ["Touch Screen", "Intel i5", "12.3-inch Display"],
-      },
-      {
-        title: "Nintendo Switch OLED",
-        price: 349.99,
-        category: "electronics",
-        description: "Hybrid gaming console",
-        image: "https://picsum.photos/400/400?random=38",
-        rating: { rate: 4.7, count: 189 },
-        stock: 34,
-        features: ["OLED Screen", "Portable", "Joy-Con Controllers"],
-      },
-      {
-        title: "DJI Mavic Air 2",
-        price: 799.99,
-        category: "electronics",
-        description: "Compact drone with 4K camera",
-        image: "https://picsum.photos/400/400?random=39",
-        rating: { rate: 4.5, count: 156 },
-        stock: 23,
-        features: ["4K Video", "34min Flight", "Obstacle Sensing"],
-      },
-      {
-        title: "Kindle Paperwhite",
-        price: 139.99,
-        category: "electronics",
-        description: "Waterproof e-reader with built-in light",
-        image: "https://picsum.photos/400/400?random=40",
-        rating: { rate: 4.6, count: 456 },
-        stock: 89,
-        features: ["Waterproof", "6.8-inch Display", "Weeks of Battery"],
-      },
-      {
-        title: "Under Armour Hoodie",
-        price: 64.99,
-        category: "clothing",
-        description: "Warm and comfortable hooded sweatshirt",
-        image: "https://picsum.photos/400/400?random=41",
-        rating: { rate: 4.3, count: 278 },
-        stock: 145,
-        features: ["Fleece Lined", "Kangaroo Pocket", "Machine Washable"],
-      },
-      {
-        title: "Puma Running Shorts",
-        price: 34.99,
-        category: "clothing",
-        description: "Lightweight athletic shorts for running",
-        image: "https://picsum.photos/400/400?random=42",
-        rating: { rate: 4.2, count: 189 },
-        stock: 200,
-        features: ["Moisture-Wicking", "Elastic Waist", "Side Pockets"],
-      },
-      {
-        title: "Columbia Hiking Boots",
-        price: 129.99,
-        category: "shoes",
-        description: "Waterproof hiking boots for outdoor adventures",
-        image: "https://picsum.photos/400/400?random=43",
-        rating: { rate: 4.4, count: 167 },
-        stock: 78,
-        features: ["Waterproof", "Ankle Support", "Durable Sole"],
-      },
-      {
-        title: "Casio G-Shock Watch",
-        price: 99.99,
-        category: "accessories",
-        description: "Rugged digital watch with multiple features",
-        image: "https://picsum.photos/400/400?random=44",
-        rating: { rate: 4.5, count: 234 },
-        stock: 156,
-        features: ["Shock Resistant", "Water Resistant", "Stopwatch"],
-      },
-      {
-        title: "Oakley Sunglasses",
-        price: 189.99,
-        category: "accessories",
-        description: "Sport sunglasses with polarized lenses",
-        image: "https://picsum.photos/400/400?random=45",
-        rating: { rate: 4.6, count: 178 },
-        stock: 89,
-        features: ["Polarized", "UV Protection", "Lightweight Frame"],
-      },
-      {
-        title: "Victorinox Swiss Army Knife",
-        price: 49.99,
-        category: "accessories",
-        description: "Multi-tool pocket knife with various functions",
-        image: "https://picsum.photos/400/400?random=46",
-        rating: { rate: 4.7, count: 345 },
-        stock: 234,
-        features: ["Multiple Tools", "Stainless Steel", "Compact"],
-      },
-      {
-        title: "Yeti Tumbler",
-        price: 39.99,
-        category: "home",
-        description: "Insulated stainless steel tumbler",
-        image: "https://picsum.photos/400/400?random=47",
-        rating: { rate: 4.8, count: 567 },
-        stock: 300,
-        features: ["Double-Wall Insulation", "Dishwasher Safe", "Leak-Proof"],
-      },
-      {
-        title: "Philips Hue Smart Bulb",
-        price: 59.99,
-        category: "home",
-        description: "Color changing smart LED bulb",
-        image: "https://picsum.photos/400/400?random=48",
-        rating: { rate: 4.4, count: 289 },
-        stock: 178,
-        features: ["Color Changing", "Voice Control", "App Controlled"],
-      },
-      {
-        title: "Weber Grill",
-        price: 299.99,
-        category: "home",
-        description: "Portable charcoal grill for outdoor cooking",
-        image: "https://picsum.photos/400/400?random=49",
-        rating: { rate: 4.7, count: 234 },
-        stock: 45,
-        features: ["Portable", "Temperature Gauge", "Ash Catcher"],
-      },
-      {
-        title: "YETI Cooler",
-        price: 299.99,
-        category: "sports",
-        description: "High-performance rotomolded cooler",
-        image: "https://picsum.photos/400/400?random=50",
-        rating: { rate: 4.8, count: 156 },
-        stock: 34,
-        features: ["Ice Retention", "Bear Resistant", "Drain Plug"],
-      },
-      {
-        title: "Callaway Golf Clubs",
-        price: 499.99,
-        category: "sports",
-        description: "Complete set of golf clubs for beginners",
-        image: "https://picsum.photos/400/400?random=51",
-        rating: { rate: 4.5, count: 123 },
-        stock: 23,
-        features: ["Complete Set", "Graphite Shafts", "Head Covers"],
-      },
-      {
-        title: "Speedo Swim Goggles",
-        price: 24.99,
-        category: "sports",
-        description: "Anti-fog swimming goggles",
-        image: "https://picsum.photos/400/400?random=52",
-        rating: { rate: 4.3, count: 278 },
-        stock: 189,
-        features: ["Anti-Fog", "UV Protection", "Adjustable Strap"],
-      },
-      {
-        title: "Spalding Basketball",
-        price: 29.99,
-        category: "sports",
-        description: "Official size basketball for indoor/outdoor use",
-        image: "https://picsum.photos/400/400?random=53",
-        rating: { rate: 4.4, count: 167 },
-        stock: 145,
-        features: ["Official Size", "Durable", "Good Grip"],
-      },
-      {
-        title: "Bose SoundLink Speaker",
-        price: 129.99,
-        category: "electronics",
-        description: "Portable Bluetooth speaker with rich sound",
-        image: "https://picsum.photos/400/400?random=54",
-        rating: { rate: 4.6, count: 289 },
-        stock: 78,
-        features: ["12hr Battery", "Voice Prompts", "Wireless Pairing"],
-      },
-      {
-        title: "Logitech MX Master Mouse",
-        price: 99.99,
-        category: "electronics",
-        description: "Ergonomic wireless mouse for productivity",
-        image: "https://picsum.photos/400/400?random=55",
-        rating: { rate: 4.7, count: 234 },
-        stock: 156,
-        features: ["Ergonomic", "Wireless", "Customizable Buttons"],
+        createdBy: new mongoose.Types.ObjectId(),
       },
     ];
-    await Product.deleteMany({}); // Clear existing products
-    await Product.insertMany(sampleProducts);
 
-    res.json({
+    // Clear existing products first
+    await Product.deleteMany({});
+
+    // Insert new products
+    const products = await Product.insertMany(sampleProducts);
+
+    res.status(201).json({
       success: true,
-      message: "Sample products initialized",
-      count: sampleProducts.length,
+      message: `${products.length} products initialized successfully`,
+      count: products.length,
+      products: products.map((product) => ({
+        id: product._id,
+        title: product.title,
+        price: product.price,
+        category: product.category,
+        image: product.image,
+        rating: product.rating,
+        stock: product.stock,
+      })),
     });
   } catch (error) {
-    // console.error("Init products error:", error);
+    console.error("Init products error:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: "Error initializing products",
+      error: error.message,
     });
   }
 });

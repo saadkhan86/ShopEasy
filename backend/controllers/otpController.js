@@ -8,12 +8,12 @@ exports.sendOTP = async (req, res) => {
     const { email } = req.body;
 
     const otp = generateOTP();
-
+    console.log(otp);
     // Save OTP to database
     await OTP.create({ email, otp });
-
     // Send email
     await sendOTPEmail(email, otp);
+    console.log(otp);
 
     res.json({ success: true, message: "OTP sent to email" });
   } catch (error) {

@@ -186,9 +186,7 @@ function Login() {
   }
   // Add this function to navigate to forgot password
   const handleForgotPassword = () => {
-    let pre="sdf1fdd1";
-    let post="1y2u2tg3";
-    let idOfUser = pre+generateStrongPassword()+post;
+    let idOfUser = generateStrongPassword();
     navigate(`/forgot/${idOfUser}`);
   };
 

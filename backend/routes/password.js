@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const passwordController = require("../controlers/passwordController");
+const passwordController = require("../controllers/passwordController");
 
 // Request password reset
 router.post("/forgot-password", passwordController.requestPasswordReset);

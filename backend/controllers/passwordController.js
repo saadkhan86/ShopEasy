@@ -1,4 +1,4 @@
-const User = require("../models/User");
+const User = require("../models/user");
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const {
@@ -67,7 +67,7 @@ exports.requestPasswordReset = async (req, res) => {
       .digest("hex");
 
     // Set token expiry (30 minutes)
-    user.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
+    user.resetPasswordExpires = Date.now() + 5 * 60 * 1000;
 
     // Track reset request
     user.lastPasswordResetRequest = Date.now();
@@ -110,7 +110,8 @@ exports.requestPasswordReset = async (req, res) => {
 exports.resetPassword = async (req, res) => {
   try {
     const { token, password } = req.body;
-
+    console.log("Reset password request:", req.body);
+    
     if (!token || !password) {
       return res.status(400).json({
         success: false,
@@ -150,7 +151,10 @@ exports.resetPassword = async (req, res) => {
     }
 
     // Check if new password is same as old password
-    const isSamePassword = await bcrypt.compare(password, user.password);
+    // Make sure user.password exists and is selectable
+    const userWithPassword = await User.findById(user._id).select("+password");
+    const isSamePassword = await bcrypt.compare(password, userWithPassword.password);
+    
     if (isSamePassword) {
       return res.status(400).json({
         success: false,
@@ -158,8 +162,17 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(password, 12);
+    // ✅ FIX: Hash new password with proper error handling
+    let hashedPassword;
+    try {
+      hashedPassword = await bcrypt.hash(password, 12);
+    } catch (hashError) {
+      console.error("Password hashing error:", hashError);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to process password",
+      });
+    }
 
     // Store old password for security audit (optional)
     const passwordHistory = user.passwordHistory || [];
@@ -173,15 +186,16 @@ exports.resetPassword = async (req, res) => {
       passwordHistory.shift();
     }
 
-    // Update user
-    user.password = hashedPassword;
-    user.passwordHistory = passwordHistory;
-    user.passwordChangedAt = Date.now();
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpires = undefined;
-    user.passwordResetRequests = 0; // Reset counter
-
-    await user.save();
+    // Update user - use findByIdAndUpdate to avoid pre-save hook issues
+    await User.findByIdAndUpdate(user._id, {
+      password: hashedPassword,
+      passwordHistory: passwordHistory,
+      passwordChangedAt: Date.now(),
+      resetPasswordToken: undefined,
+      resetPasswordExpires: undefined,
+      passwordResetRequests: 0,
+      updatedAt: Date.now(),
+    });
 
     // Send security alert email
     try {
@@ -193,15 +207,15 @@ exports.resetPassword = async (req, res) => {
 
       await sendSecurityAlertEmail(user.email, deviceInfo);
     } catch (emailError) {
-      // Don't fail the reset if security email fails
+      console.log("Security email failed:", emailError.message);
     }
 
     res.status(200).json({
       success: true,
-      message:
-        "Password reset successful. You can now login with your new password.",
+      message: "Password reset successful. You can now login with your new password.",
     });
   } catch (error) {
+    console.log("Reset password error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to reset password. Please try again.",
