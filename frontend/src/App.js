@@ -1,34 +1,38 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
-import { AlertProvider, useAlert } from "./context/AlertContext";
-import { AdminProvider } from "./context/AdminContext";
-import Home from "./Home/Home";
-import About from "./About/About";
-import Login from "./Login/Login";
-import Signup from "./Signup/Signup";
-import Navbar from "./Navbar/Navbar";
-import Profile from "./Profile/Profile";
-import ProductDetail from "./ProductDetail/ProductDetail";
-import Alert from "./Alert/Alert";
-import Terms from "./Terms/Terms";
-import EmailVerification from "./EmailVerification/EmailVerification";
-import ForgotPassword from "./ForgotPassword/ForgotPassword";
-import ResetPassword from "./ResetPassword/ResetPassword";
-import CartItems from "./CartItems/CartItems";
-import NotFound from "./NotFound/NotFound";
-import CreateListing from "./Listing/CreateListing";
-import UserListings from "./Listing/UserListings";
-import EditListing from "./Listing/EditListing";
+import { AuthProvider } from "./Component/Context/AuthContext";
+import { AlertProvider, useAlert } from "./Component/Context/AlertContext";
+import { AdminProvider } from "./Component/Context/AdminContext";
+//Website's self components
+import Home from "./Component/WebSelf/Home";
+import About from "./Component/WebSelf/About";
+import Navbar from "./Component/WebSelf/Navbar";
+import Terms from "./Component/WebSelf/Terms";
+import Login from "./Component/User/Login";
+import Signup from "./Component/User/Signup";
+import Profile from "./Component/User/Profile";
+import ProductDetail from "./Component/Product/ProductDetail";
+//Alerts
+import Alert from "./Component/Alerts/Alert";
+//User Routes
+import EmailVerification from "./Component/User/EmailVerification";
+import ForgotPassword from "./Component/User/ForgotPassword";
+import ResetPassword from "./Component/User/ResetPassword";
+import NotFound from "./Component/WebSelf/NotFound";
+//Products || Listings
+import CreateListing from "./Component/Product/CreateListing";
+import UserListings from "./Component/Product/UserListings";
+import EditListing from "./Component/Product/EditListing";
+import CartItems from "./Component/Product/CartItems"
 // Admin imports
-import AdminLogin from "./AdminLogin/AdminLogin";
-import AdminDashboard from "./Admin/AdminDashboard";
-import AdminProtectedRoute from "./components/AdminProtectedRoute";
-import AdminUsers from "./Admin/AdminUsers";
-import AdminProducts from "./Admin/AdminProducts";
-import AdminOrders from "./Admin/AdminOrders";
-import AdminAnalytics from "./Admin/AdminAnalytics";
-import AdminLayout from "./Admin/AdminLayout"; // Import the AdminLayout
+import AdminLogin from "./Component/Admin/AdminLogin";
+import AdminDashboard from "./Component/Admin/AdminDashboard";
+import AdminProtectedRoute from "./Component/Admin/AdminProtectedRoute";
+import AdminUsers from "./Component/Admin/AdminUsers";
+import AdminProducts from "./Component/Admin/AdminProducts";
+import AdminOrders from "./Component/Admin/AdminOrders";
+import AdminAnalytics from "./Component/Admin/AdminAnalytics";
+import AdminLayout from "./Component/Admin/AdminLayout"; // Import the AdminLayout
 
 // Component that uses the alert context
 const AlertWrapper = () => {
